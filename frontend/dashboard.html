@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-orange-50 min-h-screen flex items-center justify-center">
+
+  <div class="w-full max-w-lg bg-white rounded-2xl shadow-lg p-8">
+    <h2 id="welcomeMsg" class="text-2xl font-bold text-center text-orange-600 mb-6"></h2>
+
+    <div class="space-y-4">
+      <button onclick="callAPI('/profile')" 
+        class="w-full bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600 transition">
+        Get Profile
+      </button>
+
+      <button onclick="callAPI('/user')" 
+        class="w-full bg-orange-400 text-white py-2 rounded-lg hover:bg-orange-500 transition">
+        User Endpoint
+      </button>
+
+      <button onclick="callAPI('/admin')" 
+        class="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition">
+        Admin Endpoint
+      </button>
+
+      <button onclick="logout()" 
+        class="w-full bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition">
+        Logout
+      </button>
+    </div>
+
+    <div id="responseBox" class="mt-6 text-sm bg-gray-100 p-4 rounded-lg font-mono overflow-x-auto"></div>
+  </div>
+
+  <script>
+    const API_URL = "http://localhost:5000";
+    const token = localStorage.getItem("token");
+    const role = localStorage.getItem("role");
+    const email = localStorage.getItem("email");
+    const responseBox = document.getElementById("responseBox");
+
+    if (!token) {
+      window.location.href = "index.html"; // لو مفيش توكن يرجع لوجين
+    }
+
+    // ✅ تغيير الرسالة حسب الدور
+    const welcomeMsg = document.getElementById("welcomeMsg");
+    if (role === "admin") {
+      welcomeMsg.innerText = `👑 Welcome Admin ${email}`;
+    } else {
+      welcomeMsg.innerText = `Welcome ${email}`;
+    }
+
+    async function callAPI(endpoint) {
+      try {
+        const res = await fetch(`${API_URL}${endpoint}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          }
+        });
+
+        if (res.status === 401) {
+          logout(); // لو التوكن بايظ يرجع لوجين
+        }
+
+        const data = await res.json();
+        responseBox.innerText = JSON.stringify(data, null, 2);
+      } catch (err) {
+        responseBox.innerText = "❌ Error: " + err.message;
+      }
+    }
+
+    function logout() {
+      localStorage.clear();
+      window.location.href = "index.html";
+    }
+  </script>
+</body>
+</html>
