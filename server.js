@@ -5,6 +5,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const path = require("path");
+const pool = require("./db");
 const authorize = require("./helpers/authorize");
 const authenticate = require("./helpers/authenticate");
 dotenv.config();
@@ -30,23 +31,28 @@ const generateToken = (user) => {
 };
 
 
+// ✅ Register with Postgres
 app.post("/register", async (req, res) => {
-    try {
-        const { email, password, role } = req.body;
+  try {
+    const { email, password, role } = req.body;
 
-        const hashed = await bcrypt.hash(password, 10);
-        const newUser = {
-            id: Date.now(),
-            email,
-            password: hashed,
-            role: role || "user",
-        };
+    // 1. Hash password
+    const hashed = await bcrypt.hash(password, 10);
 
-        users.push(newUser);
-        res.status(201).json({ message: "User registered" });
-    } catch (err) {
-        res.status(500).json({ error: "Server error" });
-    }
+    // 2. Insert into Postgres
+    const result = await pool.query(
+      "INSERT INTO users (email, password, role) VALUES ($1, $2, $3) RETURNING id, email, role",
+      [email, hashed, role || "user"]
+    );
+
+    res.status(201).json({
+      message: "User registered",
+      user: result.rows[0], 
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 app.post("/login", async (req, res) => {
