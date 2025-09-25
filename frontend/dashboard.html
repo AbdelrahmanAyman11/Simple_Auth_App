@@ -16,15 +16,17 @@
         Get Profile
       </button>
 
-      <button onclick="callAPI('/user')" 
+      <button onclick="goToProducts()" 
         class="w-full bg-orange-400 text-white py-2 rounded-lg hover:bg-orange-500 transition">
         User Endpoint
       </button>
 
-      <button onclick="callAPI('/admin')" 
+
+      <button onclick="goToAdmin()" 
         class="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition">
         Admin Endpoint
       </button>
+
 
       <button onclick="logout()" 
         class="w-full bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition">
@@ -79,6 +81,23 @@
       localStorage.clear();
       window.location.href = "index.html";
     }
+
+     function goToProducts() {
+        if(role==="user")  {window.location.href = "products.html";}
+         else {
+              responseBox.innerText = "❌ Unauthorized: Only Users can access this page.";
+            }
+        }
+       
+
+        function goToAdmin() {
+            if (role === "admin") {
+              window.location.href = "admin_products.html"; 
+            } else {
+              responseBox.innerText = "❌ Unauthorized: Only admins can access this page.";
+            }
+      }
+
   </script>
 </body>
 </html>

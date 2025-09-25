@@ -92,6 +92,33 @@ app.get("/user", authenticate, authorize("user"), (req, res) => {
   res.json({ message: `Welcome User ${req.user.email}` });
 });
 
+
+// ✅ Get all products (للـ user بس)
+app.get("/products", authenticate, authorize("user"), async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM products ORDER BY created_at DESC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error("❌ Products error:", err.message);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ✅ Add new product (لو عايز الادمن يضيف)
+app.post("/products", authenticate, authorize("admin"), async (req, res) => {
+  try {
+    const { name, price } = req.body;
+    const result = await pool.query(
+      "INSERT INTO products (name, price) VALUES ($1, $2) RETURNING *",
+      [name, price]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error("❌ Add product error:", err.message);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, "frontend", "index.html"));
 });

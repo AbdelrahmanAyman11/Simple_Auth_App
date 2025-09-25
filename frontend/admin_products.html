@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin - Manage Products</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+
+  <div class="w-full max-w-lg bg-white shadow-lg rounded-xl p-6">
+    <h1 class="text-2xl font-bold text-center text-red-600 mb-4">Admin - Add Product</h1>
+
+    <form id="productForm" class="space-y-4">
+      <input type="text" id="name" placeholder="Product Name"
+        class="w-full border rounded-lg p-2" required>
+      <input type="number" id="price" placeholder="Price"
+        class="w-full border rounded-lg p-2" required>
+      <button type="submit"
+        class="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition">
+        Add Product
+      </button>
+    </form>
+
+    <div id="responseBox" class="mt-4 text-sm bg-gray-100 p-3 rounded-lg"></div>
+  </div>
+
+  <script>
+    const API_URL = "http://localhost:5000";
+    const token = localStorage.getItem("token");
+    const role = localStorage.getItem("role");
+    const responseBox = document.getElementById("responseBox");
+
+    if (!token || role !== "admin") {
+      window.location.href = "index.html"; // بس الأدمين يدخل
+    }
+
+    document.getElementById("productForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = document.getElementById("name").value;
+      const price = document.getElementById("price").value;
+
+      try {
+        const res = await fetch(`${API_URL}/products`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ name, price })
+        });
+
+        const data = await res.json();
+        responseBox.innerText = JSON.stringify(data, null, 2);
+      } catch (err) {
+        responseBox.innerText = "❌ Error: " + err.message;
+      }
+    });
+  </script>
+</body>
+</html>
