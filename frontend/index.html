@@ -110,12 +110,13 @@ loginForm.addEventListener("submit", async (e) => {
     body: JSON.stringify({ email, password }),
   });
   const data = await res.json();
+  console.log("Login response:", data);
 
   if (data.token) {
     // ✅ خزّن البيانات
     localStorage.setItem("token", data.token);
-    localStorage.setItem("role", data.role);
-    localStorage.setItem("email", data.email);
+    localStorage.setItem("role", data.user.role);
+    localStorage.setItem("email", data.user.email);
 
     responseBox.innerText = "✅ Login successful! Redirecting...";
 
