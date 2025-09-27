@@ -10,7 +10,12 @@
   <div class="w-full max-w-lg bg-white shadow-lg rounded-xl p-6">
     <h1 class="text-2xl font-bold text-center text-orange-600 mb-4">Available Products</h1>
 
-    <ul id="productList" class="space-y-3"></ul>
+    <ul id="productList"></ul>
+
+    <button onclick="placeOrder()" 
+      class="w-full mt-4 bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600 transition">
+      Place Order
+    </button>
   </div>
 
   <script>
@@ -22,6 +27,7 @@
       window.location.href = "index.html"; // بس اليوزر يدخل
     }
 
+    // تحميل المنتجات من API
     async function loadProducts() {
       try {
         const res = await fetch(`${API_URL}/products`, {
@@ -34,12 +40,66 @@
 
         products.forEach(p => {
           const li = document.createElement("li");
-          li.className = "p-4 bg-gray-50 border rounded-lg shadow";
-          li.innerText = `${p.name} - $${p.price}`;
+          li.className = "p-4 mb-2 bg-gray-50 border rounded-lg shadow flex justify-between items-center";
+          li.dataset.id = p.id;
+          li.dataset.price = p.price;
+          li.dataset.name = p.name; // 
+
+          li.innerHTML = `
+            <span class="product-name">${p.name} - $${p.price}</span>
+            <input type="number" min="0" value="0" 
+              class="w-16 border rounded p-1 text-center">
+          `;
           list.appendChild(li);
         });
       } catch (err) {
         console.error("❌ Error:", err);
+      }
+    }
+
+    async function placeOrder() {
+      const lis = document.querySelectorAll("#productList li");
+      const items = [];
+
+      lis.forEach(li => {
+        const productId = li.dataset.id;
+        const productPrice = parseFloat(li.dataset.price);
+        const productName = li.dataset.name; // ✅ هتكون موجودة دايمًا دلوقتي
+        const qty = parseInt(li.querySelector("input").value) || 0;
+
+        if (qty > 0) {
+          items.push({
+            product_id: productId,
+            product_name: productName,
+            quantity: qty,
+            unit_price: productPrice // ✅ بدل price بقت unit_price
+        });
+        }
+      });
+
+      if (items.length === 0) {
+        alert("⚠️ Please select at least one product!");
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_URL}/orders`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ items })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          alert("✅ Order created! Total: $" + data.total_price);
+        } else {
+          alert("❌ Error: " + (data.error || "Unknown error"));
+        }
+      } catch (err) {
+        alert("❌ Error: " + err.message);
       }
     }
 
