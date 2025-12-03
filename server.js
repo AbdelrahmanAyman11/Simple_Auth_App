@@ -156,6 +156,142 @@ app.post("/orders", authenticate, async (req, res) => {
   }
 });
 
+// ✅ Enhanced Checkout Route with full billing/shipping info
+app.post("/checkout", authenticate, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { items, billing_info, shipping_info, payment_method, total_amount } = req.body;
+    const userId = req.user.id;
+    const user_email = req.user.email;
+
+    // TODO: Add input validation here - students should fix this
+    // No check if items exists or is array
+    // No validation of billing_info fields
+    // No sanitization of user inputs
+
+    const calculated_total = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+    const shipping_cost = calculated_total > 100 ? 0 : 5; // Magic number - should be configurable
+    const tax = calculated_total * 0.1; // Hardcoded tax rate - should be in database
+    const final_total = calculated_total + shipping_cost + tax;
+
+    await client.query("BEGIN");
+
+    // 1. Create order with full details
+    const orderRes = await client.query(`
+      INSERT INTO orders (
+        user_id, user_email, total_price, status,
+        billing_name, billing_email, billing_phone, billing_address, 
+        billing_city, billing_postal_code, billing_country,
+        shipping_name, shipping_address, shipping_city, 
+        shipping_postal_code, shipping_country,
+        payment_method, payment_status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) 
+      RETURNING id
+    `, [
+      userId, user_email, final_total, 'pending',
+      billing_info.name, billing_info.email, billing_info.phone, 
+      billing_info.address, billing_info.city, billing_info.postal_code, billing_info.country,
+      shipping_info.name || billing_info.name, 
+      shipping_info.address || billing_info.address,
+      shipping_info.city || billing_info.city,
+      shipping_info.postal_code || billing_info.postal_code,
+      shipping_info.country || billing_info.country,
+      payment_method, 'pending'
+    ]);
+
+    const orderId = orderRes.rows[0].id;
+
+    // 2. Insert order items - No inventory check (students should add this)
+    for (const item of items) {
+      await client.query(
+        "INSERT INTO order_items (order_id, product_id, quantity, unit_price, product_name) VALUES ($1, $2, $3, $4, $5)",
+        [orderId, item.product_id, item.quantity, item.unit_price, item.product_name]
+      );
+    }
+
+    // 3. Insert order status history
+    await client.query(
+      "INSERT INTO order_status_history (order_id, status, notes) VALUES ($1, $2, $3)",
+      [orderId, 'pending', 'Order placed successfully']
+    );
+
+    await client.query("COMMIT");
+
+    res.status(201).json({ 
+      message: "✅ Order placed successfully", 
+      orderId, 
+      total_price: final_total,
+      order_details: {
+        subtotal: calculated_total,
+        shipping: shipping_cost,
+        tax: tax,
+        total: final_total
+      }
+    });
+
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("❌ Checkout error:", err.message);
+    res.status(500).json({ error: "Server error during checkout" }); // Poor error message for user
+  } finally {
+    client.release();
+  }
+});
+
+// ✅ Get user's orders
+app.get("/my-orders", authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const ordersResult = await pool.query(`
+      SELECT o.*, 
+        COUNT(oi.id) as items_count,
+        STRING_AGG(oi.product_name, ', ') as products
+      FROM orders o
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+      WHERE o.user_id = $1
+      GROUP BY o.id
+      ORDER BY o.created_at DESC
+    `, [userId]);
+
+    res.json(ordersResult.rows);
+  } catch (err) {
+    console.error("❌ Get orders error:", err.message);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ✅ Get specific order details
+app.get("/orders/:orderId", authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const orderId = req.params.orderId;
+
+    // Get order details
+    const orderResult = await pool.query(
+      "SELECT * FROM orders WHERE id = $1 AND user_id = $2",
+      [orderId, userId]
+    );
+
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    // Get order items
+    const itemsResult = await pool.query(
+      "SELECT * FROM order_items WHERE order_id = $1",
+      [orderId]
+    );
+
+    const order = orderResult.rows[0];
+    order.items = itemsResult.rows;
+
+    res.json(order);
+  } catch (err) {
+    console.error("❌ Get order details error:", err.message);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, "frontend", "index.html"));
 });

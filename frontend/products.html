@@ -2,108 +2,332 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>User - Products</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
-<body class="bg-orange-50 min-h-screen flex items-center justify-center">
+<body class="bg-gradient-to-br from-orange-50 to-orange-100 min-h-screen">
 
-  <div class="w-full max-w-lg bg-white shadow-lg rounded-xl p-6">
-    <h1 class="text-2xl font-bold text-center text-orange-600 mb-4">Available Products</h1>
+  <!-- Header -->
+  <header class="bg-white shadow-sm border-b border-orange-200">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+      <h1 class="text-2xl font-bold text-orange-600">
+        <i class="fas fa-store mr-2"></i>Products
+      </h1>
+      <div class="flex items-center space-x-4">
+        <!-- Cart Icon -->
+        <div class="relative">
+          <button onclick="toggleCart()" class="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition flex items-center">
+            <i class="fas fa-shopping-cart mr-2"></i>Cart 
+            <span id="cartCount" class="ml-1 bg-orange-700 text-white text-xs rounded-full px-2 py-1">0</span>
+          </button>
+        </div>
+        <!-- User Info -->
+        <div class="text-gray-600">
+          <span id="userEmail"></span>
+        </div>
+        <!-- Logout -->
+        <button onclick="logout()" class="text-orange-600 hover:text-orange-800 transition">
+          <i class="fas fa-sign-out-alt mr-1"></i>Logout
+        </button>
+      </div>
+    </div>
+  </header>
 
-    <ul id="productList"></ul>
+  <!-- Cart Sidebar -->
+  <div id="cartSidebar" class="fixed right-0 top-0 h-full w-80 bg-white shadow-xl transform translate-x-full transition-transform duration-300 z-50">
+    <div class="p-4 border-b border-gray-200">
+      <div class="flex justify-between items-center">
+        <h2 class="text-lg font-semibold text-gray-800">Shopping Cart</h2>
+        <button onclick="toggleCart()" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    </div>
+    
+    <div id="cartItems" class="flex-1 overflow-y-auto p-4 max-h-96">
+      <!-- Cart items will be populated here -->
+    </div>
+    
+    <div class="border-t border-gray-200 p-4">
+      <div class="flex justify-between items-center mb-4">
+        <span class="font-semibold">Total: </span>
+        <span id="cartTotal" class="font-bold text-lg text-orange-600">$0.00</span>
+      </div>
+      <button onclick="proceedToCheckout()" 
+        class="w-full bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        id="checkoutBtn" disabled>
+        <i class="fas fa-credit-card mr-2"></i>Proceed to Checkout
+      </button>
+    </div>
+  </div>
 
-    <button onclick="placeOrder()" 
-      class="w-full mt-4 bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600 transition">
-      Place Order
-    </button>
+  <!-- Overlay -->
+  <div id="cartOverlay" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40" onclick="toggleCart()"></div>
+
+  <!-- Main Content -->
+  <div class="max-w-6xl mx-auto px-4 py-8">
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold text-gray-800 mb-2">Available Products</h2>
+      <p class="text-gray-600">Add products to your cart and proceed to checkout</p>
+    </div>
+
+    <!-- Products Grid -->
+    <div id="productGrid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Products will be populated here -->
+    </div>
   </div>
 
   <script>
     const API_URL = "http://localhost:5000";
     const token = localStorage.getItem("token");
     const role = localStorage.getItem("role");
+    
+    let cart = [];
+    let products = [];
 
+    // Check authentication
     if (!token || role !== "user") {
-      window.location.href = "index.html"; // بس اليوزر يدخل
+      window.location.href = "index.html";
     }
 
-    // تحميل المنتجات من API
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+      loadProducts();
+      loadCart();
+      displayUserInfo();
+    });
+
+    function displayUserInfo() {
+      let userEmail = localStorage.getItem("user_email") || "";
+      console.log("Debug - Retrieved user_email from localStorage:", userEmail);
+      
+      // If no email in localStorage, try to get it from the token
+      if (!userEmail) {
+        const token = localStorage.getItem("token");
+        if (token) {
+          try {
+            const tokenPayload = JSON.parse(atob(token.split('.')[1]));
+            userEmail = tokenPayload.email || "";
+            console.log("Debug - Retrieved email from token:", userEmail);
+            // Store it for future use
+            if (userEmail) {
+              localStorage.setItem("user_email", userEmail);
+            }
+          } catch (error) {
+            console.log("Debug - Error parsing token:", error);
+          }
+        }
+      }
+      
+      console.log("Debug - Final userEmail to display:", userEmail);
+      document.getElementById("userEmail").textContent = userEmail || "User";
+    }
+
+    // Load products from API
     async function loadProducts() {
       try {
         const res = await fetch(`${API_URL}/products`, {
           headers: { "Authorization": `Bearer ${token}` }
         });
 
-        const products = await res.json();
-        const list = document.getElementById("productList");
-        list.innerHTML = "";
-
-        products.forEach(p => {
-          const li = document.createElement("li");
-          li.className = "p-4 mb-2 bg-gray-50 border rounded-lg shadow flex justify-between items-center";
-          li.dataset.id = p.id;
-          li.dataset.price = p.price;
-          li.dataset.name = p.name; // 
-
-          li.innerHTML = `
-            <span class="product-name">${p.name} - $${p.price}</span>
-            <input type="number" min="0" value="0" 
-              class="w-16 border rounded p-1 text-center">
-          `;
-          list.appendChild(li);
-        });
+        products = await res.json();
+        displayProductsGrid();
       } catch (err) {
         console.error("❌ Error:", err);
+        alert("Error loading products");
       }
     }
 
-    async function placeOrder() {
-      const lis = document.querySelectorAll("#productList li");
-      const items = [];
+    function displayProductsGrid() {
+      const grid = document.getElementById("productGrid");
+      grid.innerHTML = "";
 
-      lis.forEach(li => {
-        const productId = li.dataset.id;
-        const productPrice = parseFloat(li.dataset.price);
-        const productName = li.dataset.name; // ✅ هتكون موجودة دايمًا دلوقتي
-        const qty = parseInt(li.querySelector("input").value) || 0;
-
-        if (qty > 0) {
-          items.push({
-            product_id: productId,
-            product_name: productName,
-            quantity: qty,
-            unit_price: productPrice // ✅ بدل price بقت unit_price
-        });
-        }
+      products.forEach(product => {
+        const productCard = document.createElement("div");
+        productCard.className = "bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow";
+        productCard.innerHTML = `
+          <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-gray-800">${product.name}</h3>
+              <span class="text-xl font-bold text-orange-600">$${product.price}</span>
+            </div>
+            
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <button onclick="updateQuantity(${product.id}, -1)" 
+                  class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 transition">
+                  <i class="fas fa-minus text-xs"></i>
+                </button>
+                <span id="qty-${product.id}" class="w-8 text-center font-semibold">0</span>
+                <button onclick="updateQuantity(${product.id}, 1)" 
+                  class="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center hover:bg-orange-600 transition">
+                  <i class="fas fa-plus text-xs"></i>
+                </button>
+              </div>
+              
+              <button onclick="addToCart(${product.id})" 
+                class="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition flex items-center">
+                <i class="fas fa-cart-plus mr-2"></i>Add to Cart
+              </button>
+            </div>
+          </div>
+        `;
+        grid.appendChild(productCard);
       });
+    }
 
-      if (items.length === 0) {
-        alert("⚠️ Please select at least one product!");
+    let quantities = {};
+
+    function updateQuantity(productId, change) {
+      if (!quantities[productId]) quantities[productId] = 0;
+      quantities[productId] = quantities[productId] + change; // BUG: No validation for negative values
+      document.getElementById(`qty-${productId}`).textContent = quantities[productId];
+    }
+
+    function addToCart(productId) {
+      const quantity = quantities[productId]; // BUG: No validation, could be 0 or negative
+      // BUG: No check for quantity validation
+
+      const product = products.find(p => p.id == productId);
+      if (!product) return;
+
+      // BUG: No inventory check - students should add stock validation
+
+      // Check if item already in cart
+      const existingItem = cart.find(item => item.product_id == productId);
+      if (existingItem) {
+        existingItem.quantity += quantity;
+      } else {
+        cart.push({
+          product_id: productId,
+          product_name: product.name,
+          unit_price: parseFloat(product.price), // BUG: No error handling for invalid price
+          quantity: quantity
+        });
+      }
+
+      // Reset quantity display
+      quantities[productId] = 0;
+      document.getElementById(`qty-${productId}`).textContent = 0;
+
+      updateCartDisplay();
+      saveCart();
+      
+      // Show success feedback
+      showToast(`Added ${quantity} × ${product.name} to cart!`);
+    }
+
+    function updateCartDisplay() {
+      const cartItemsContainer = document.getElementById("cartItems");
+      const cartCount = document.getElementById("cartCount");
+      const cartTotal = document.getElementById("cartTotal");
+      const checkoutBtn = document.getElementById("checkoutBtn");
+
+      // Update cart count
+      const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+      cartCount.textContent = totalItems;
+
+      // Update cart items display
+      cartItemsContainer.innerHTML = "";
+      
+      if (cart.length === 0) {
+        cartItemsContainer.innerHTML = '<p class="text-gray-500 text-center py-8">Your cart is empty</p>';
+        checkoutBtn.disabled = true;
+      } else {
+        cart.forEach((item, index) => {
+          const itemElement = document.createElement("div");
+          itemElement.className = "flex justify-between items-center p-3 border-b border-gray-100";
+          itemElement.innerHTML = `
+            <div class="flex-1">
+              <h4 class="font-medium text-gray-800">${item.product_name}</h4>
+              <p class="text-sm text-gray-600">$${item.unit_price} × ${item.quantity}</p>
+            </div>
+            <div class="flex items-center space-x-2">
+              <span class="font-semibold">$${item.unit_price * item.quantity}</span>
+              <button onclick="removeFromCart(${index})" class="text-red-500 hover:text-red-700">
+                <i class="fas fa-trash-alt"></i>
+              </button>
+            </div>
+          `;
+          cartItemsContainer.appendChild(itemElement);
+        });
+        checkoutBtn.disabled = false;
+      }
+
+      // Update total - BUG: Floating point precision issues
+      const total = cart.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+      cartTotal.textContent = `$${total}`; // BUG: No .toFixed(2) - can show long decimals
+    }
+
+    function removeFromCart(index) {
+      cart.splice(index, 1);
+      updateCartDisplay();
+      saveCart();
+      showToast("Item removed from cart");
+    }
+
+    function toggleCart() {
+      const sidebar = document.getElementById("cartSidebar");
+      const overlay = document.getElementById("cartOverlay");
+      
+      if (sidebar.classList.contains("translate-x-full")) {
+        sidebar.classList.remove("translate-x-full");
+        overlay.classList.remove("hidden");
+      } else {
+        sidebar.classList.add("translate-x-full");
+        overlay.classList.add("hidden");
+      }
+    }
+
+    function proceedToCheckout() {
+      if (cart.length === 0) {
+        alert("Your cart is empty!");
         return;
       }
 
-      try {
-        const res = await fetch(`${API_URL}/orders`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
-          },
-          body: JSON.stringify({ items })
-        });
+      // Save cart to localStorage for checkout page
+      localStorage.setItem("cartItems", JSON.stringify(cart));
+      localStorage.setItem("user_email", localStorage.getItem("user_email") || "");
+      
+      // Navigate to checkout
+      window.location.href = "checkout.html";
+    }
 
-        const data = await res.json();
-        if (res.ok) {
-          alert("✅ Order created! Total: $" + data.total_price);
-        } else {
-          alert("❌ Error: " + (data.error || "Unknown error"));
-        }
-      } catch (err) {
-        alert("❌ Error: " + err.message);
+    function saveCart() {
+      localStorage.setItem("cart", JSON.stringify(cart));
+    }
+
+    function loadCart() {
+      const savedCart = localStorage.getItem("cart");
+      if (savedCart) {
+        cart = JSON.parse(savedCart);
+        updateCartDisplay();
       }
     }
 
-    loadProducts();
+    function showToast(message) {
+      // Simple toast notification
+      const toast = document.createElement("div");
+      toast.className = "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity";
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => toast.remove(), 300);
+      }, 2000);
+    }
+
+    function logout() {
+      localStorage.removeItem("token");
+      localStorage.removeItem("role");
+      localStorage.removeItem("user_email");
+      localStorage.removeItem("cart");
+      localStorage.removeItem("cartItems");
+      window.location.href = "index.html";
+    }
   </script>
 </body>
 </html>
