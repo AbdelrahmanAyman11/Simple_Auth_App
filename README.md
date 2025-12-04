@@ -41,9 +41,9 @@ Before running the project, make sure you have installed:
 
 ## ⚙️ Setup
 
-### 1 Install dependencies
+###  Install dependencies
 ```bash
-npm install
+ 1. open terminal then write -> npm install
 
  2. Database setup
 
@@ -54,36 +54,91 @@ CREATE DATABASE test_app;
 
 Run PostgreSQL and execute the schema:
 
-CREATE TABLE users (
-  id SERIAL PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
-  password TEXT NOT NULL,
-  role TEXT DEFAULT 'user'
+-- 1. Users table 
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(50) DEFAULT 'user',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE TABLE products (
-  id SERIAL PRIMARY KEY,
-  name TEXT NOT NULL,
-  price NUMERIC NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW()
+ 
+-- 2. Products table 
+CREATE TABLE IF NOT EXISTS products (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    description TEXT,
+    stock_quantity INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE TABLE orders (
-  id SERIAL PRIMARY KEY,
-  user_id INT REFERENCES users(id),
-  user_email TEXT NOT NULL,
-  total_price NUMERIC NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW()
+ 
+-- 3. Enhanced Orders table 
+CREATE TABLE IF NOT EXISTS orders (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    user_email VARCHAR(255),
+    total_price DECIMAL(10, 2) NOT NULL,
+    status VARCHAR(50) DEFAULT 'pending',
+    -- Billing Information
+    billing_name VARCHAR(255),
+    billing_email VARCHAR(255),
+    billing_phone VARCHAR(20),
+    billing_address TEXT,
+    billing_city VARCHAR(100),
+    billing_postal_code VARCHAR(20),
+    billing_country VARCHAR(100),
+    -- Shipping Information (if different from billing)
+    shipping_name VARCHAR(255),
+    shipping_address TEXT,
+    shipping_city VARCHAR(100),
+    shipping_postal_code VARCHAR(20),
+    shipping_country VARCHAR(100),
+    -- Payment Information
+    payment_method VARCHAR(50),
+    payment_status VARCHAR(50) DEFAULT 'pending',
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE TABLE order_items (
-  id SERIAL PRIMARY KEY,
-  order_id INT REFERENCES orders(id) ON DELETE CASCADE,
-  product_id INT REFERENCES products(id) ON DELETE CASCADE,
-  product_name TEXT NOT NULL,
-  quantity INT NOT NULL,
-  unit_price NUMERIC NOT NULL
+ 
+-- 4. Enhanced Order Items table 
+CREATE TABLE IF NOT EXISTS order_items (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
+    product_id INTEGER REFERENCES products(id),
+    product_name VARCHAR(255),
+    quantity INTEGER NOT NULL,
+    unit_price DECIMAL(10, 2) NOT NULL,
+    total_price DECIMAL(10, 2) GENERATED ALWAYS AS (quantity * unit_price) STORED,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ 
+-- 5. Shopping Cart table (for persistent cart storage)
+CREATE TABLE IF NOT EXISTS cart_items (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+    quantity INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, product_id)
+);
+ 
+-- 6. Order Status History table (optional - for tracking order status changes)
+CREATE TABLE IF NOT EXISTS order_status_history (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
+    status VARCHAR(50) NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+ 
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_cart_items_user_id ON cart_items(user_id);
 
 ------------------------------------------
 3. Environment variables
