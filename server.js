@@ -17,7 +17,16 @@ app.use(express.json());
 // خلي الباك يوزّع الملفات بتاعة الفرونت
 app.use(express.static(path.join(__dirname, "frontend")));
 
-
+// ✅ Test database connection
+app.get("/test-db", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT NOW()");
+    res.json({ success: true, message: "Database connected!", time: result.rows[0] });
+  } catch (err) {
+    console.error("❌ Database test error:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // ✅ Register with Postgres
 app.post("/register", async (req, res) => {
@@ -38,8 +47,9 @@ app.post("/register", async (req, res) => {
       user: result.rows[0],
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    console.error("❌ Register error:", err.message);
+    console.error("Full error:", err);
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 });
 
